@@ -1,11 +1,49 @@
-```{r}
+```{r libraries}
 # libraries
 
 library(readr)
 library(dplyr)
+library(stringr)
+library(corrplot)
 
 # read in data
 
 instagram <- read_csv("~/sta440-individual-project/data/instagram_data.csv")
 ```
+```{r data-clean}
+# create hour and day of the week values
+
+instagram$created_at_date <- as.POSIXct(instagram$created_at, 
+                                        origin = "1970-01-01", tz = "UTC")
+instagram$hour <- as.numeric(format(instagram$created_at_date, "%H"))
+instagram$day_of_week <- weekdays(instagram$created_at_date)
+
+# create weekend, @, # indicators
+
+instagram <- instagram |> 
+  mutate(
+  weekend = if_else(day_of_week == "Sunday" | day_of_week == "Saturday", 1, 0),
+  caption_length = nchar(caption),
+  hashtag = if_else(str_detect(caption, "#"), 1, 0),
+  tag = if_else(str_detect(caption, "@"), 1, 0),
+  video = if_else(is_video == TRUE, 1, 0), 
+  multiple_images = if_else(multiple_images == TRUE, 1, 0)) |> 
+  select(likes, comments, followers, following, 
+         hour, weekend, caption_length, hashtag, tag, video, multiple_images)
+```
+```{r check-multicollinearity}
+# correlation between predictors
+
+predictors <- instagram[, c("comments", "followers", "following", "hour", "weekend",
+                     "caption_length", "hashtag", "tag", "video", "multiple_images")]
+cor_matrix <- cor(predictors, use = "complete.obs")
+print(cor_matrix)
+
+# corrplot(cor_matrix, method = "color", type = "upper", tl.cex = 0.8)
+
+# all correlations are <0.6
+```
+
+
+
 
