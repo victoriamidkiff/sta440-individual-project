@@ -23,12 +23,14 @@ instagram$day_of_week <- weekdays(instagram$created_at_date)
 instagram <- instagram |> 
   mutate(
   weekend = if_else(day_of_week == "Sunday" | day_of_week == "Saturday", 1, 0),
-  caption_length = nchar(caption),
+  caption_length = if_else(is.na(caption), 0, nchar(caption)),
   hashtag = if_else(str_detect(caption, "#"), 1, 0),
   tag = if_else(str_detect(caption, "@"), 1, 0),
   video = if_else(is_video == TRUE, 1, 0), 
-  multiple_images = if_else(multiple_images == TRUE, 1, 0)) |> 
-  select(likes, comments, followers, following, 
+  multiple_images = if_else(multiple_images == TRUE, 1, 0),
+  engagement = likes/followers
+  ) |> 
+  select(likes, engagement, comments, followers, following, 
          hour, weekend, caption_length, hashtag, tag, video, multiple_images)
 ```
 ```{r check-multicollinearity}
@@ -43,6 +45,47 @@ print(cor_matrix)
 
 # all correlations are <0.6
 ```
+```{r model-selection}
+# make indicator variables
+
+instagram$hour <- as.factor(instagram$hour)
+instagram$weekend <- as.factor(instagram$weekend)
+instagram$hashtag <- as.factor(instagram$hashtag)
+instagram$tag <- as.factor(instagram$tag)
+instagram$video <- as.factor(instagram$video)
+instagram$multiple_images <- as.factor(instagram$multiple_images)
+instagram <- na.omit(instagram)
+
+# model with all predictors 
+
+instagram_model1 <- lm(engagement ~ comments + followers + following + 
+                         hour + weekend + caption_length + hashtag + tag + video + 
+                         multiple_images + hour*video + hour*weekend + weekend*video + 
+                         followers*video + followers*weekend, data = instagram)
+
+summary(instagram_model1)
+
+# model with all timing predictors and all significant
+
+instagram_model2 <- step(instagram_model1, 
+                         direction = "backward",
+                         scope = list(lower = ~ comments + followers + caption_length + 
+                                        video + multiple_images + hour + weekend),)
+summary(instagram_model2)
+
+# model without timing predictors
+
+instagram_model3 <- step(instagram_model1, 
+                         direction = "backward",
+                         scope = list(lower = ~ comments + followers + caption_length + 
+                                        video + multiple_images),)
+summary(instagram_model3)
+
+```
+```{r model-comparison}
+# aic and bic values
+```
+
 
 
 
