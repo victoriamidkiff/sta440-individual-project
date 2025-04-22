@@ -1,0 +1,11 @@
+```{r}
+# libraries
+
+library(readr)
+library(dplyr)
+
+# read in data
+
+instagram <- read_csv("~/sta440-individual-project/data/instagram_data.csv")
+```
+
