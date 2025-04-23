@@ -6,4 +6,10 @@ geometry: "margin=0.5in"
 author: "Victoria Midkiff"
 ---
 
-## Peer Review Response
+## title here
+
+#### Victoria Midkiff
+
+## Introduction
+
+Social media platforms such as Instagram offer users a way to reach wide audiences, and as such, many users and businesses aim to increase engagement on the platform. One key component of engagement is maximizing the number of likes a post receives relative to the number of followers the user has. One aspect of Instagram users and businesses have control over is the time of day at which they post. This begs the research question, does the hour of day at which an Instagram post is published affect its engagement, and what other factors are correlated with engagement? Other factors investigated include the type of post (carousel with multiple images or video post), if the post was published on a weekend, the presence of hashtags or mentions in the caption, and account characteristics like follower count and following count.
