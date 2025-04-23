@@ -5,6 +5,8 @@ library(readr)
 library(dplyr)
 library(stringr)
 library(corrplot)
+library(car)
+library(knitr)
 
 # read in data
 
@@ -84,6 +86,24 @@ summary(instagram_model3)
 ```
 ```{r model-comparison}
 # aic and bic values
+# need to choose one and indicate it
+
+instagram_model_aic <- AIC(instagram_model1, instagram_model2, instagram_model3) 
+instagram_model_bic <- BIC(instagram_model1, instagram_model2, instagram_model3) 
+
+instagram_aic_bic <- data.frame(
+  Model = rownames(instagram_model_aic),
+  AIC = round(instagram_model_aic$AIC,3),
+  BIC = round(instagram_model_bic$BIC,3)
+) |> mutate(
+  Model = case_when(
+    Model == "instagram_model1" ~ "Candidate Model 1",
+    Model == "instagram_model2" ~ "Candidate Model 2",
+    Model == "instagram_model3" ~ "Candidate Model 3"))
+
+print(instagram_aic_bic)
+
+kable(vif(instagram_model2))
 ```
 
 
