@@ -7,12 +7,23 @@ library(stringr)
 library(corrplot)
 library(car)
 library(knitr)
+library(broom)
+library(ggplot2)
+library(gridExtra)
+set.seed(2025)
 
 # read in data
 
 instagram <- read_csv("~/sta440-individual-project/data/instagram_data.csv")
 ```
 ```{r data-clean}
+
+instagram <- instagram |>
+  filter(!is.na(owner_username)) |>
+  group_by(owner_id) %>%
+  slice_sample(n = 1) %>%
+  ungroup()
+
 # create hour and day of the week values
 
 instagram$created_at_date <- as.POSIXct(instagram$created_at, 
@@ -31,15 +42,16 @@ instagram <- instagram |>
   video = if_else(is_video == TRUE, 1, 0), 
   multiple_images = if_else(multiple_images == TRUE, 1, 0),
   location = if_else(is.na(location), 0, 1),
-  engagement = likes/followers
+  engagement = likes/followers,
+  comments_ratio = comments/followers
   ) |> 
-  select(likes, engagement, comments, followers, following, hour, weekend, 
+  select(likes, engagement, comments_ratio, followers, following, hour, weekend, 
          caption_length, hashtag, tag, location, video, multiple_images)
 ```
 ```{r check-multicollinearity}
 # correlation between predictors
 
-predictors <- instagram[, c("comments", "followers", "following", "hour", 
+predictors <- instagram[, c("comments_ratio", "followers", "following", "hour", 
                             "weekend", "caption_length", "hashtag", "tag", 
                             "location", "video", "multiple_images")]
 cor_matrix <- cor(predictors, use = "complete.obs")
@@ -49,6 +61,7 @@ print(cor_matrix)
 
 # all correlations are <0.6
 ```
+
 ```{r model-selection}
 # make indicator variables
 
@@ -58,31 +71,34 @@ instagram$hashtag <- as.factor(instagram$hashtag)
 instagram$tag <- as.factor(instagram$tag)
 instagram$video <- as.factor(instagram$video)
 instagram$multiple_images <- as.factor(instagram$multiple_images)
+instagram$location <- as.factor(instagram$location)
 instagram <- na.omit(instagram)
 
 # model with all predictors 
+instagram$log_engagement <- log(instagram$engagement + 1e-4)
+#instagram$followers <- scale(instagram$followers)
 
-instagram_model1 <- lm(engagement ~ comments + followers + following + 
+instagram_model1 <- lm(log_engagement ~ followers + following + 
                          hour + weekend + caption_length + hashtag + tag + video + 
-                         multiple_images + hour*video + hour*weekend + weekend*video + 
-                         followers*video + followers*weekend, data = instagram)
+                         multiple_images + location + hour*video + hour*weekend + 
+                         weekend*video + followers*weekend, data = instagram)
 
 summary(instagram_model1)
+
+# vif(instagram_model1)
 
 # model with all timing predictors and all significant
 
 instagram_model2 <- step(instagram_model1, 
                          direction = "backward",
-                         scope = list(lower = ~ comments + followers + caption_length + 
+                         scope = list(lower = ~ followers + 
                                         video + multiple_images + hour + weekend),)
 summary(instagram_model2)
 
 # model without timing predictors
 
 instagram_model3 <- step(instagram_model1, 
-                         direction = "backward",
-                         scope = list(lower = ~ comments + followers + caption_length + 
-                                        video + multiple_images),)
+                         direction = "backward")
 summary(instagram_model3)
 
 ```
@@ -107,6 +123,47 @@ print(instagram_aic_bic)
 
 kable(vif(instagram_model2))
 ```
+
+```{r check-assumptions}
+
+# check linearity assumptions
+
+instagram_model_aug <- augment(instagram_model2)
+
+p1 <-ggplot(instagram_model_aug, aes(x = .fitted, y = .resid)) + 
+  geom_point(size = 0.5) + 
+  geom_hline(yintercept = 0, color = "darkred") + 
+  labs(x = "Fitted (predicted) value", y = "Residual") + 
+  theme_bw() +
+  theme(aspect.ratio = 1)+
+  ggtitle("Figure 2.1")
+
+p2 <- ggplot(instagram_model_aug, aes(x = .resid)) + 
+  geom_histogram(aes(y = ..density..), 
+                     fill = "deepskyblue", color = "darkblue", bins = 25) + 
+  stat_function(fun = dnorm, 
+                args = list(mean = mean(instagram_model_aug$.resid),
+                            sd = sd(instagram_model_aug$.resid)),
+                color = "darkred", lwd = 1) +
+  labs(x = "Residual", y = "Density") + 
+  theme_bw() +
+  theme(aspect.ratio = 1)+
+  ggtitle("Figure 2.2")
+
+p3 <- ggplot(instagram_model_aug, aes(sample = .resid)) +
+  stat_qq(size = 0.5) + 
+  stat_qq_line() + 
+  theme_bw() + 
+  labs(x = "Theoretical quantiles", 
+       y = "Sample quantiles") +
+  theme(aspect.ratio = 1) +
+  ggtitle("Figure 2.3")
+
+grid.arrange(p1, p2, p3, nrow = 1,
+             top = "Checking Model 2 Assumptions for Regression")
+```
+
+
 
 
 
