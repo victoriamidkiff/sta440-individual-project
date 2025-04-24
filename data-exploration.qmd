@@ -16,12 +16,13 @@ set.seed(2025)
 
 instagram <- read_csv("~/sta440-individual-project/data/instagram_data.csv")
 ```
+
 ```{r data-clean}
 
 instagram <- instagram |>
   filter(!is.na(owner_username)) |>
-  group_by(owner_id) %>%
-  slice_sample(n = 1) %>%
+  group_by(owner_id) |>
+  slice_sample(n = 1) |>
   ungroup()
 
 # create hour and day of the week values
@@ -64,6 +65,7 @@ print(cor_matrix)
 
 ```{r model-selection}
 # make indicator variables
+# log transform response variable
 
 instagram$hour <- as.factor(instagram$hour)
 instagram$weekend <- as.factor(instagram$weekend)
@@ -73,10 +75,9 @@ instagram$video <- as.factor(instagram$video)
 instagram$multiple_images <- as.factor(instagram$multiple_images)
 instagram$location <- as.factor(instagram$location)
 instagram <- na.omit(instagram)
+instagram$log_engagement <- log(instagram$engagement + 1e-4)
 
 # model with all predictors 
-instagram$log_engagement <- log(instagram$engagement + 1e-4)
-#instagram$followers <- scale(instagram$followers)
 
 instagram_model1 <- lm(log_engagement ~ followers + following + 
                          hour + weekend + caption_length + hashtag + tag + video + 
@@ -91,8 +92,8 @@ summary(instagram_model1)
 
 instagram_model2 <- step(instagram_model1, 
                          direction = "backward",
-                         scope = list(lower = ~ followers + 
-                                        video + multiple_images + hour + weekend),)
+                         scope = list(lower = ~ followers + video + multiple_images + 
+                                        hour + weekend),)
 summary(instagram_model2)
 
 # model without timing predictors
@@ -100,8 +101,8 @@ summary(instagram_model2)
 instagram_model3 <- step(instagram_model1, 
                          direction = "backward")
 summary(instagram_model3)
-
 ```
+
 ```{r model-comparison}
 # aic and bic values
 # need to choose one and indicate it
