@@ -12,7 +12,7 @@ library(knitr)
 library(broom)
 library(ggplot2)
 library(gridExtra)
-set.seed(2025)
+set.seed(25)
 
 # read in data
 
@@ -26,6 +26,7 @@ instagram <- read_csv("~/sta440-individual-project/data/instagram_data.csv")
 
 instagram <- instagram |>
   filter(!is.na(owner_username)) |>
+  filter(!is.na(followers)) |>
   group_by(owner_id) |>
   slice_sample(n = 1) |>
   ungroup()
@@ -49,20 +50,34 @@ instagram <- instagram |>
   multiple_images = if_else(multiple_images == TRUE, 1, 0),
   location = if_else(is.na(location), 0, 1),
   engagement = likes/followers,
-  comments_ratio = comments/followers
+  comments_ratio = comments/followers, 
+  hour = as.integer(hour), 
+  time_of_day_bin = case_when(
+    hour >= 5  & hour < 12 ~ "Morning (5–11am)",
+    hour >= 12 & hour < 17 ~ "Afternoon (12–4pm)",
+    hour >= 17 & hour < 21 ~ "Evening (5–8pm)",
+    TRUE                   ~ "Night (9pm–4am)"
+  ),
+  time_of_day_bin = factor(
+    time_of_day_bin,
+    levels = c("Morning (5–11am)", "Afternoon (12–4pm)", 
+                 "Evening (5–8pm)", "Night (9pm–4am)"))
   ) |> 
-  select(likes, engagement, comments_ratio, followers, following, hour, weekend, 
-         caption_length, hashtag, tag, location, video, multiple_images) 
+  select(likes, engagement, comments_ratio, followers, following, hour, 
+         time_of_day_bin, weekend, caption_length, hashtag, tag, location, 
+         video, multiple_images) 
+
+#write_csv(instagram, "data/instagram_clean.csv")
+
 ```
 
 ```{r check-multicollinearity}
-#| echo: false
+#| include: false
 # correlation between predictors
 
 name_lookup <- c(
   followers = "Number of followers",
   following = "Number of accounts following",
-  hour = "Change in Right Impulse (N·s)",
   weekend = "Posted on weekend",
   caption_length = "Caption length (characters)",
   hashtag = "Caption contains hashtag",
@@ -70,11 +85,12 @@ name_lookup <- c(
   location = "Post has location tag", 
   video = "Post is a video",
   multiple_images = "Post is a carousel", 
+  time_of_day_bin = "Time of day",
   "weekend:video" = "Weekend × Video",
   "followers:weekend" = "Followers × Weekend"
 )
 
-predictors <- instagram[, c("followers", "following", "hour", 
+predictors <- instagram[, c("followers", "following", "time_of_day_bin", 
                             "weekend", "caption_length", "hashtag", "tag", 
                             "location", "video", "multiple_images")]
 cor_matrix <- cor(predictors, use = "complete.obs")
@@ -95,7 +111,7 @@ kable(cor_matrix, caption = "Correlation between Model Predictors")
 # make indicator variables
 # log transform response variable
 
-instagram$hour <- as.factor(instagram$hour)
+instagram$time_of_day_bin <- as.factor(instagram$time_of_day_bin)
 instagram$weekend <- as.factor(instagram$weekend)
 instagram$hashtag <- as.factor(instagram$hashtag)
 instagram$tag <- as.factor(instagram$tag)
