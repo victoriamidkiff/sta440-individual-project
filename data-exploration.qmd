@@ -20,7 +20,7 @@ instagram$created_at_date <- as.POSIXct(instagram$created_at,
 instagram$hour <- as.numeric(format(instagram$created_at_date, "%H"))
 instagram$day_of_week <- weekdays(instagram$created_at_date)
 
-# create weekend, @, # indicators
+# create indicators
 
 instagram <- instagram |> 
   mutate(
@@ -30,16 +30,18 @@ instagram <- instagram |>
   tag = if_else(str_detect(caption, "@"), 1, 0),
   video = if_else(is_video == TRUE, 1, 0), 
   multiple_images = if_else(multiple_images == TRUE, 1, 0),
+  location = if_else(is.na(location), 0, 1),
   engagement = likes/followers
   ) |> 
-  select(likes, engagement, comments, followers, following, 
-         hour, weekend, caption_length, hashtag, tag, video, multiple_images)
+  select(likes, engagement, comments, followers, following, hour, weekend, 
+         caption_length, hashtag, tag, location, video, multiple_images)
 ```
 ```{r check-multicollinearity}
 # correlation between predictors
 
-predictors <- instagram[, c("comments", "followers", "following", "hour", "weekend",
-                     "caption_length", "hashtag", "tag", "video", "multiple_images")]
+predictors <- instagram[, c("comments", "followers", "following", "hour", 
+                            "weekend", "caption_length", "hashtag", "tag", 
+                            "location", "video", "multiple_images")]
 cor_matrix <- cor(predictors, use = "complete.obs")
 print(cor_matrix)
 
