@@ -1,4 +1,6 @@
 ```{r libraries}
+#| echo: false
+
 # libraries
 
 library(readr)
@@ -18,6 +20,9 @@ instagram <- read_csv("~/sta440-individual-project/data/instagram_data.csv")
 ```
 
 ```{r data-clean}
+#| echo: false
+
+# random post per user
 
 instagram <- instagram |>
   filter(!is.na(owner_username)) |>
@@ -47,23 +52,46 @@ instagram <- instagram |>
   comments_ratio = comments/followers
   ) |> 
   select(likes, engagement, comments_ratio, followers, following, hour, weekend, 
-         caption_length, hashtag, tag, location, video, multiple_images)
+         caption_length, hashtag, tag, location, video, multiple_images) 
 ```
+
 ```{r check-multicollinearity}
+#| echo: false
 # correlation between predictors
 
-predictors <- instagram[, c("comments_ratio", "followers", "following", "hour", 
+name_lookup <- c(
+  followers = "Number of followers",
+  following = "Number of accounts following",
+  hour = "Change in Right Impulse (N·s)",
+  weekend = "Posted on weekend",
+  caption_length = "Caption length (characters)",
+  hashtag = "Caption contains hashtag",
+  tag = "Caption contains user tag",
+  location = "Post has location tag", 
+  video = "Post is a video",
+  multiple_images = "Post is a carousel", 
+  "weekend:video" = "Weekend × Video",
+  "followers:weekend" = "Followers × Weekend"
+)
+
+predictors <- instagram[, c("followers", "following", "hour", 
                             "weekend", "caption_length", "hashtag", "tag", 
                             "location", "video", "multiple_images")]
 cor_matrix <- cor(predictors, use = "complete.obs")
-print(cor_matrix)
+
+
+colnames(cor_matrix) <- name_lookup[colnames(cor_matrix)]
+rownames(cor_matrix) <- name_lookup[rownames(cor_matrix)]
+cor_matrix <- round(cor_matrix, digits = 3) 
+kable(cor_matrix, caption = "Correlation between Model Predictors")
 
 # corrplot(cor_matrix, method = "color", type = "upper", tl.cex = 0.8)
-
 # all correlations are <0.6
 ```
 
 ```{r model-selection}
+#| echo: false
+
 # make indicator variables
 # log transform response variable
 
@@ -77,6 +105,14 @@ instagram$location <- as.factor(instagram$location)
 instagram <- na.omit(instagram)
 instagram$log_engagement <- log(instagram$engagement + 1e-4)
 
+# create hour labels
+
+hour_labels <- setNames(paste0(formatC(0:23 %% 12 + 1, width = 2, flag = "0"),
+                               ifelse(0:23 < 12, "am", "pm"), "–",
+                               formatC((1:24) %% 12 + 1, width = 2, flag = "0"),
+                               ifelse(1:24 <= 12, "am", "pm")), 
+                        paste0("hour", 1:23))
+
 # model with all predictors 
 
 instagram_model1 <- lm(log_engagement ~ followers + following + 
@@ -85,8 +121,6 @@ instagram_model1 <- lm(log_engagement ~ followers + following +
                          weekend*video + followers*weekend, data = instagram)
 
 summary(instagram_model1)
-
-# vif(instagram_model1)
 
 # model with all timing predictors and all significant
 
@@ -103,7 +137,106 @@ instagram_model3 <- step(instagram_model1,
 summary(instagram_model3)
 ```
 
+```{r format models}
+# model 1 (all variables)
+
+instagram_model1 |>
+  tidy(conf.int = TRUE, conf.level = 0.95) |>
+  select(term, estimate, conf.low, conf.high, p.value) |>
+  mutate(term = case_when(
+    term == "(Intercept)" ~ "Intercept",
+    term == "followers" ~ "Number of followers",
+    term == "following" ~ "Number of accounts following",
+    term == "caption_length" ~ "Caption length (characters)",
+    term == "hashtag1" ~ "Caption contains hashtag",
+    term == "tag1" ~ "Caption contains user tag",
+    term == "video1" ~ "Post is a video",
+    term == "multiple_images1" ~ "Post is a carousel",
+    term == "weekend1" ~ "Posted on weekend",
+    term == "location1" ~ "Post has location tag",
+    term %in% names(hour_labels) ~ hour_labels[term],
+
+    grepl("^hour[0-9]+:video1$", term) ~ paste0(
+      "Video × ", hour_labels[gsub(":video1", "", term)]),
+    grepl("^hour[0-9]+:weekend1$", term) ~ paste0(
+      "Weekend × ", hour_labels[gsub(":weekend1", "", term)]),
+    term == "weekend1:video1" ~ "Video × Weekend",
+    term == "followers:weekend1" ~ "Followers × Weekend",
+    TRUE ~ term
+  )) |>
+  rename(
+    "Exposure Variable" = term,
+    "Estimate of Slope" = estimate,
+    "95% CI Lower" = conf.low,
+    "95% CI Upper" = conf.high,
+    "P-Value" = p.value) |>
+  mutate(across(
+    where(is.numeric),
+    ~ if_else(abs(.) < 0.001, "<0.001", sprintf("%.3f", .))
+  ))|>
+  kable(caption = "Model 1: Regression Model of Instagram Engagement Using Post Characteristics and Time-of-Day Effects")
+
+# format model 2 (chosen model)
+
+instagram_model2 |>
+  tidy(conf.int = TRUE, conf.level = 0.95) |>
+  select(term, estimate, conf.low, conf.high, p.value) |>
+  mutate(term = case_when(
+    term == "(Intercept)" ~ "Intercept",
+    term == "followers" ~ "Number of followers",
+    term == "caption_length" ~ "Caption length (characters)",
+    term == "video1" ~ "Post is a video",
+    term %in% names(hour_labels) ~ hour_labels[term],
+    term == "multiple_images1" ~ "Post is a carousel",
+    term == "weekend1" ~ "Posted on weekend",
+
+    grepl("^hour[0-9]+:video1$", term) ~ paste0(
+      "Video × ", hour_labels[gsub(":video1", "", term)]),
+    grepl("^hour[0-9]+:weekend1$", term) ~ paste0(
+      "Weekend × ", hour_labels[gsub(":weekend1", "", term)]),
+    term == "weekend1:video1" ~ "Video × Weekend",
+    term == "followers:weekend1" ~ "Followers × Weekend",
+    TRUE ~ term)) |>
+  rename(
+    "Exposure Variable" = term,
+    "Estimate of Slope" = estimate,
+    "95% CI Lower" = conf.low,
+    "95% CI Upper" = conf.high,
+    "P-Value" = p.value) |>
+  mutate(across(
+    where(is.numeric),
+    ~ if_else(abs(.) < 0.001, "<0.001", sprintf("%.3f", .))
+  ))|>
+  kable(caption = "Regression Model of Instagram Engagement Using Post Characteristics and Time-of-Day Effects")
+  
+# format model 3 
+
+instagram_model3 |>
+  tidy(conf.int = TRUE, conf.level = 0.95) |>
+  select(term, estimate, conf.low, conf.high, p.value) |>
+  mutate(term = case_when(
+    term == "(Intercept)" ~ "Intercept",
+    term == "caption_length" ~ "Caption length (characters)",
+    term == "weekend1" ~ "Posted on weekend",
+    term == "video1" ~ "Post is a video",
+    term == "weekend1:video1" ~ "Video × Weekend",
+  )) |>
+  rename(
+    "Exposure Variable" = term,
+    "Estimate of Slope" = estimate,
+    "95% CI Lower" = conf.low,
+    "95% CI Upper" = conf.high,
+    "P-Value" = p.value) |>
+  mutate(across(
+    where(is.numeric),
+    ~ if_else(abs(.) < 0.001, "<0.001", sprintf("%.3f", .))
+  )) |>
+  kable(caption = "Model 3: Regression Model of Instagram Engagement Using Post Characteristics and Time-of-Day Effects")
+```
+
 ```{r model-comparison}
+#| echo: false
+
 # aic and bic values
 # need to choose one and indicate it
 
@@ -117,15 +250,23 @@ instagram_aic_bic <- data.frame(
 ) |> mutate(
   Model = case_when(
     Model == "instagram_model1" ~ "Candidate Model 1",
-    Model == "instagram_model2" ~ "Candidate Model 2",
+    Model == "instagram_model2" ~ "Candidate Model 2 (chosen model)",
     Model == "instagram_model3" ~ "Candidate Model 3"))
 
-print(instagram_aic_bic)
+kable(instagram_aic_bic)
 
-kable(vif(instagram_model2))
+instagram_vif <- vif(instagram_model2)
+rownames(instagram_vif) <- name_lookup[rownames(instagram_vif)]
+colnames(instagram_vif) <- c(
+   "Generalized VIF", 
+   "Df (Factor Levels - 1)", 
+   "Scaled GVIF"
+ )
+kable(instagram_vif)
 ```
 
 ```{r check-assumptions}
+#| echo: false
 
 # check linearity assumptions
 
@@ -161,7 +302,7 @@ p3 <- ggplot(instagram_model_aug, aes(sample = .resid)) +
   ggtitle("Figure 2.3")
 
 grid.arrange(p1, p2, p3, nrow = 1,
-             top = "Checking Model 2 Assumptions for Regression")
+             top = "Checking Model Assumptions for Regression")
 ```
 
 

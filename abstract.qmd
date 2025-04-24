@@ -7,7 +7,6 @@ author: "Victoria Midkiff"
 ---
 
 ## title here
-**Victoria Midkiff**
 
 **Introduction**
 
@@ -17,6 +16,7 @@ The data used is a sample of over 8,000 public Instagram posts posted between Se
 **ADD EDA HERE?**
 
 **Methodology**
+
 To ensure independence across observations, one post was randomly sampled per Instagram user, resulting in over 900 unique data points. From post captions and locations, variables for the hour of posting, whether the post was published on a weekend, caption length, presence of hashtags or user mentions, and indicators for video posts, carousels, and location tags were created. Follower count and following count 
 at the time of posting were also included as predictors. The response variable, engagement, was defined as the ratio of likes to followers and then log-transformed to stabilize variance and meet the assumptions of linear regression.
 
