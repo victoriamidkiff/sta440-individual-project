@@ -10,17 +10,17 @@ author: "Victoria Midkiff"
 
 **Introduction**
 
-Social media platforms such as Instagram offer users a way to reach wide audiences, and as such, many users and businesses aim to increase engagement on the platform. One key component of engagement is maximizing the number of likes a post receives relative to the number of followers the user has. One aspect of Instagram users and businesses have control over is the time of day at which they post. This begs the research question, does the hour of day at which an Instagram post is published affect its engagement, and what other factors are correlated with engagement? Other factors investigated include the type of post (carousel with multiple images or video post), if the post was published on a weekend, caption characteristics including length and the presence of hashtags or mentions in the caption, if a location was added, and account characteristics like follower count and following count.
+Social media platforms such as Instagram offer users a way to reach wide audiences, and as such, many users and businesses aim to increase engagement on the platform. One key component of engagement is maximizing the number of likes a post receives relative to the number of followers the user has. One aspect of Instagram users and businesses have control over is the time of day at which they post. This begs the research question, does the time of day (Morning, Afternoon, Evening or Night) at which an Instagram post is published affect its engagement, and what other factors are correlated with engagement? Other factors investigated include the type of post (carousel with multiple images or video post), if the post was published on a weekend, caption characteristics including length and the presence of hashtags or mentions in the caption, if a location was added, and account characteristics like follower count and following count.
 
 The data used is a sample of over 8,000 public Instagram posts posted between September 2011 and February 2024 posted by 931 randomly sampled users across the world. Each observation is a single post. The original data included the number of likes it received, the number of users following and followed by the post's associated account at the time of posting, the account's username, and the post's caption. Instagram allows users to add a location to a post, but this is not required to publish one. This location data was also included, along with the time stamp at which the post was published. One post can include multiple images or videos, known as a carousel, and this was a boolean variable in the orignial data set. If the post included at least one video, this was indicated as well. The data was obtained from Kaggle and originally scraped from Instagram.
 **ADD EDA HERE?**
 
 **Methodology**
 
-To ensure independence across observations, one post was randomly sampled per Instagram user, resulting in over 900 unique data points. From post captions and locations, variables for the hour of posting, whether the post was published on a weekend, caption length, presence of hashtags or user mentions, and indicators for video posts, carousels, and location tags were created. Follower count and following count 
+To ensure independence across observations, one post was randomly sampled per Instagram user, resulting in over 900 unique data points. From post captions and locations, variables for the time day of posting, whether the post was published on a weekend, caption length, presence of hashtags or user mentions, and indicators for video posts, carousels, and location tags were created. Follower count and following count 
 at the time of posting were also included as predictors. The response variable, engagement, was defined as the ratio of likes to followers and then log-transformed to stabilize variance and meet the assumptions of linear regression.
 
-A linear regression model was used to evaluate the relationship between post characteristics and engagement. The initial model (see Appendix Table 3) included all relevant predictors and several motivated interaction terms, such as between post type and hour of day, and between follower count and weekend indicator. Correlation analysis and variance inflation factors were performed and indicated that multicollinearity was not a concern. A modified automated backward selection process was applied to reduce the predictors in the model. The final model (see Table 1) was selected based on a combination of AIC, BIC, and relevance to the research question. Model assumptions (linearity, constant variance, normality of residuals, and independence) were checked and found to be reasonably satisfied through residual diagnostics and the data sampling strategy.
+A linear regression model was used to evaluate the relationship between post characteristics and engagement. The initial model (see Appendix Table 3) included all relevant predictors and several motivated interaction terms, such as between post type and time of day, and between follower count and weekend indicator. Correlation analysis and variance inflation factors were performed and indicated that multicollinearity was not a concern. A modified automated backward selection process was applied to reduce the predictors in the model. The final model (see Table 1) was selected based on a combination of AIC, BIC, and relevance to the research question. Model assumptions (linearity, constant variance, normality of residuals, and independence) were checked and found to be reasonably satisfied through residual diagnostics and the data sampling strategy.
 
 **Results**
 ```{r libraries}
@@ -40,7 +40,10 @@ library(ggplot2)
 library(gridExtra)
 library(kableExtra)
 set.seed(25)
-instagram <- read_csv("~/sta440-individual-project/data/instagram_clean.csv")
+instagram <- read_csv("data/instagram_clean.csv") |>
+  mutate(time_of_day_bin = factor(time_of_day_bin,
+      levels = c("Morning (5–11am)", "Afternoon (12–4pm)", 
+                 "Evening (5–8pm)", "Night (9pm–4am)")))
 ```
 ```{r model-selection}
 #| include: false
@@ -59,28 +62,21 @@ instagram$multiple_images <- as.factor(instagram$multiple_images)
 instagram$location <- as.factor(instagram$location)
 instagram <- na.omit(instagram)
 instagram$log_engagement <- log(instagram$engagement + 1e-4)
-
-# create hour labels
-
-hour_labels <- setNames(paste0(formatC(0:23 %% 12 + 1, width = 2, flag = "0"),
-                               ifelse(0:23 < 12, "am", "pm"), "–",
-                               formatC((1:24) %% 12 + 1, width = 2, flag = "0"),
-                               ifelse(1:24 <= 12, "am", "pm")), 
-                        paste0("hour", 1:23))
+#summary(instagram_model1)
 
 # model with all predictors 
 
 instagram_model1 <- lm(log_engagement ~ followers + following + 
-                         hour + weekend + caption_length + hashtag + tag + video + 
-                         multiple_images + location + hour*video + hour*weekend + 
+                         time_of_day_bin + weekend + caption_length + hashtag + 
+                         tag + video + multiple_images + location + 
+                         time_of_day_bin*video + time_of_day_bin*weekend + 
                          weekend*video + followers*weekend, data = instagram)
-
 # model with all timing predictors and all significant
 
 instagram_model2 <- step(instagram_model1, 
                          direction = "backward",
                          scope = list(lower = ~ followers + video + multiple_images + 
-                                        hour + weekend),)
+                                        time_of_day_bin + weekend),)
 # model without timing predictors
 
 instagram_model3 <- step(instagram_model1, 
@@ -93,7 +89,7 @@ instagram_model3 <- step(instagram_model1,
 
 ## Detailed Methodology
 
-Many users have multiple posts in the dataset, so the observations are not independent. To account for this, one post was randomly sampled per user. Over 900 data points were still retained. The data cleaning involved making several new variables to use as predictors for engagement. Based on the timestamps, a binary indicator indicating if the post was published on a weekend and a variable representing the hour of day the post was published were created (the baselines are not on a weekend and posted between 12 and 1 am). Based on the caption, the number of characters in the caption and binary indicators if the caption contained hashtags or user mentions were added (the baselines are no hashtags and no mentions). Additionally, an indicator variable representing a location added to the post was created. The variables indicating if a post was a video or if a post was a carousel were converted to factors. 
+Many users have multiple posts in the dataset, so the observations are not independent. To account for this, one post was randomly sampled per user. Over 900 data points were still retained. The data cleaning involved making several new variables to use as predictors for engagement. Based on the timestamps, a binary indicator indicating if the post was published on a weekend and a variable representing the time of day the post was published were created (the baselines are not on a weekend and posted in the mornings). A post made between 5 am and 11:59 am is considered posted in the morning, 12 pm to 4:59 pm is considred an afternoon post, 5 pm to 8:59 is considered evening, and 9 pm to 4:59 am is considered night. These were created based on natural breaks during the day in modern society. Based on the caption, the number of characters in the caption and binary indicators if the caption contained hashtags or user mentions were added (the baselines are no hashtags and no mentions). Additionally, an indicator variable representing a location added to the post was created. The variables indicating if a post was a video or if a post was a carousel were converted to factors.
 
 The response variable, engagement, was created by dividing the number of like a post received by the followers the posting account had at the time. Likes and follower count are naturally highly correlated, as users following account see a post in their feed, so more likes are expected. Using likes alone would favor accounts with larger followings, so this standardization allows for a fair comparison across posts from accounts of different sizes. Using the ratio of likes to followers captures the relative success of a post in terms of engagement, rather than absolute popularity. This was then log transformed (a small constant was added to avoid taking the logarithm of zero) to better satisfy the assumptions of linear regression, specifically normality of residuals and homoscedasticity. This transformation helps stabilize variance and reduce the strong skew present in the engagement distribution.
 
@@ -120,17 +116,15 @@ instagram_model2 |>
     term == "followers" ~ "Number of followers",
     term == "caption_length" ~ "Caption length (characters)",
     term == "video1" ~ "Post is a video",
-    term %in% names(hour_labels) ~ hour_labels[term],
     term == "multiple_images1" ~ "Post is a carousel",
     term == "weekend1" ~ "Posted on weekend",
     term == "hashtag1" ~ "Caption contains hashtag",
-
-    grepl("^hour[0-9]+:video1$", term) ~ paste0(
-      "Video × ", hour_labels[gsub(":video1", "", term)]),
-    grepl("^hour[0-9]+:weekend1$", term) ~ paste0(
-      "Weekend × ", hour_labels[gsub(":weekend1", "", term)]),
     term == "weekend1:video1" ~ "Video × Weekend",
     term == "followers:weekend1" ~ "Followers × Weekend",
+    term == "location1" ~ "Post has location tag",
+    term == "time_of_day_binAfternoon (12–4pm)" ~ "Afternoon (12–4pm)",
+    term == "time_of_day_binEvening (5–8pm)" ~ "Evening (5–8pm)",
+    term == "time_of_day_binNight (9pm–4am)" ~ "Night (9pm–4am)",
     TRUE ~ term)) |>
   rename(
     "Exposure Variable" = term,
@@ -144,61 +138,72 @@ instagram_model2 |>
   ))|>
   kable(caption = "Regression Model of Instagram Engagement Using Post Characteristics and Time-of-Day Effects")
 ```
-
-```{r visualization, fig.width=12}
+```{r visualization, fig.width=9, fig.align='center'}
 #| echo: false
 #| warning: false
 #| message: false
+# load in data
 instagram_df <- read_csv("~/sta440-individual-project/data/instagram_clean.csv")
+instagram_df <- read_csv("data/instagram_clean.csv") |>
+  mutate(
+    time_of_day_bin = factor(
+      time_of_day_bin,
+      levels = c("Morning (5–11am)", "Afternoon (12–4pm)", 
+                 "Evening (5–8pm)", "Night (9pm–4am)")))
+
 instagram_df$log_engagement <- log(instagram_df$engagement + 1e-4)
 
-# summarize by hour & post type
+# group data to plot
 plot_data <- instagram_df %>%
-  group_by(hour, video) %>%
+  group_by(time_of_day_bin, video) %>%
   summarize(
-    mean_log_eng = mean(log_engagement, na.rm = TRUE),
-    se = sd(log_engagement, na.rm = TRUE) / sqrt(n()),
-    .groups = "drop"
+    mean_likes = mean(likes, na.rm = TRUE),
+    .groups      = "drop"
   )
 
 # plot
-ggplot(plot_data, aes(x = as.numeric(as.character(hour)),
-                      y = mean_log_eng,
-                      color = factor(video, levels = c(0, 1),
+viz <- ggplot(plot_data, aes(x = time_of_day_bin, y = mean_likes, 
+                      fill = factor(video, levels = c(0, 1),
                                      labels = c("Post is not a video", 
-                                                "Post is a video"))
-                   )) +
-  geom_line() +
-  geom_point() +
-  scale_x_continuous(breaks = 0:23) +
+                                                "Post is a video")), 
+                      group = video)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.9) +
+  scale_y_continuous(breaks = seq(0, 60000, 
+                                 by = 10000)) +
   labs(
-    x = "Hour of Day",
-    y = "Mean Log-Engagement",
-    color = "Post Type",
-    title = "Figure 1: Average Log-Engagement by Hour and Post Type"
-  ) +
+    x      = "Time of Day",
+    y      = "Number of Likes",
+    fill  = "Post Type"  ) +
   theme_minimal() +
   theme(
-    axis.text.x = element_text(vjust = 0.5, size = 8),
-    plot.title = element_text(size = 14),
-    panel.grid.minor = element_blank()   
+    axis.text.x = element_text(angle = 45, hjust = 0.9),
   )
 
+grid.arrange(viz, top = "Figure 1: Engagement Patterns Across Time-of-Day and Post Type")
 ```
+
 
 \newpage 
 ## Appendix
-
 ```{r check-multicollinearity}
 #| echo: false
 #| warning: false
 #| message: false
 # correlation between predictors
+instagram_df <- read_csv("~/sta440-individual-project/data/instagram_clean.csv")
+instagram_df <- read_csv("data/instagram_clean.csv") |>
+  mutate(
+    time_of_day_bin = factor(
+      time_of_day_bin,
+      levels = c("Morning (5–11am)", "Afternoon (12–4pm)", 
+                 "Evening (5–8pm)", "Night (9pm–4am)")))
+
+instagram_df$log_engagement <- log(instagram_df$engagement + 1e-4)
+instagram_df$time_of_day_bin <- as.integer(instagram_df$time_of_day_bin)
 
 name_lookup <- c(
   followers = "Number of followers",
   following = "Number of accounts following",
-  hour = "Change in Right Impulse (N·s)",
   weekend = "Posted on weekend",
   caption_length = "Caption length (characters)",
   hashtag = "Caption contains hashtag",
@@ -206,12 +211,12 @@ name_lookup <- c(
   location = "Post has location tag", 
   video = "Post is a video",
   multiple_images = "Post is a carousel", 
+  time_of_day_bin = "Time of day",
   "weekend:video" = "Weekend × Video",
   "followers:weekend" = "Followers × Weekend"
 )
 
-
-predictors <- instagram_df[, c("followers", "following", "hour", 
+predictors <- instagram_df[, c("followers", "following", "time_of_day_bin",
                             "weekend", "caption_length", "hashtag", "tag", 
                             "location", "video", "multiple_images")]
 cor_matrix <- cor(predictors, use = "complete.obs")
@@ -243,14 +248,17 @@ instagram_model1 |>
     term == "multiple_images1" ~ "Post is a carousel",
     term == "weekend1" ~ "Posted on weekend",
     term == "location1" ~ "Post has location tag",
-    term %in% names(hour_labels) ~ hour_labels[term],
-
-    grepl("^hour[0-9]+:video1$", term) ~ paste0(
-      "Video × ", hour_labels[gsub(":video1", "", term)]),
-    grepl("^hour[0-9]+:weekend1$", term) ~ paste0(
-      "Weekend × ", hour_labels[gsub(":weekend1", "", term)]),
     term == "weekend1:video1" ~ "Video × Weekend",
     term == "followers:weekend1" ~ "Followers × Weekend",
+    term == "time_of_day_binAfternoon (12–4pm)" ~ "Afternoon (12–4pm)",
+    term == "time_of_day_binEvening (5–8pm)" ~ "Evening (5–8pm)",
+    term == "time_of_day_binNight (9pm–4am)" ~ "Night (9pm–4am)",
+    term == "time_of_day_binAfternoon (12–4pm):video1" ~ "Afternoon × Video",
+    term == "time_of_day_binEvening (5–8pm):video1" ~ "Evening × Video",
+    term == "time_of_day_binNight (9pm–4am):video1" ~ "Night × Video",
+    term == "time_of_day_binAfternoon (12–4pm):weekend1" ~ "Afternoon × Weekend",
+    term == "time_of_day_binEvening (5–8pm):weekend1" ~ "Evening × Weekend",
+    term == "time_of_day_binNight (9pm–4am):weekend1" ~ "Night × Weekend",
     TRUE ~ term
   )) |>
   rename(
@@ -276,7 +284,8 @@ instagram_model3 |>
     term == "weekend1" ~ "Posted on weekend",
     term == "video1" ~ "Post is a video",
     term == "weekend1:video1" ~ "Video × Weekend",
-    term == "hashtag1" ~ "Caption contains hashtag"
+    term == "hashtag1" ~ "Caption contains hashtag",
+    term == "location1" ~ "Post has location tag"
   )) |>
   rename(
     "Exposure Variable" = term,
@@ -324,7 +333,7 @@ colnames(instagram_vif) <- c(
 kable(instagram_vif, caption = "VIFs for Chosen Regression Model")
 ```
 
-```{r check-assumptions, fig.width=12}
+```{r check-assumptions, fig.align='center', fig.width=12}
 #| echo: false
 #| warning: false
 #| message: false

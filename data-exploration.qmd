@@ -67,7 +67,7 @@ instagram <- instagram |>
          time_of_day_bin, weekend, caption_length, hashtag, tag, location, 
          video, multiple_images) 
 
-#write_csv(instagram, "data/instagram_clean.csv")
+write_csv(instagram, "data/instagram_clean.csv")
 
 ```
 
