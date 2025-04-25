@@ -12,7 +12,7 @@ library(knitr)
 library(broom)
 library(ggplot2)
 library(gridExtra)
-set.seed(25)
+set.seed(2025)
 
 # read in data
 
